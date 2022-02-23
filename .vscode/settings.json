@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.m": "matlab",
+        "__mutex_base": "c",
+        "memory": "c"
+    }
+}

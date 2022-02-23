@@ -29,12 +29,24 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
-//
+/**
+ * @brief Trap中需要知道的寄存器
+ * 在硬件中还有一个寄存器叫做程序计数器（Program Counter Register）。
+表明当前mode的标志位，这个标志位表明了当前是supervisor mode还是user mode。当我们在运行Shell的时候，自然是在user mode。
+还有一堆控制CPU工作方式的寄存器，比如SATP（Supervisor Address Translation and Protection）寄存器，它包含了指向page table的物理内存地址（详见4.3）。
+还有一些对于今天讨论非常重要的寄存器，比如STVEC（Supervisor Trap Vector Base Address Register）寄存器，它指向了内核中处理trap的指令的起始地址。
+SEPC（Supervisor Exception Program Counter）寄存器，在trap的过程中保存程序计数器的值。
+SSRATCH（Supervisor Scratch Register）寄存器，这也是个非常重要的寄存器（详见6.5）。
+ */
+
+// 理解trap这一过程的关键在于，uservec(蹦床页)仅仅是帮助完成从用户态到内核态的切换(对某些关键寄存器的修改)
+// uservec在切换内核和用户态的关键操作是更换了SATP（Supervisor Address Translation and Protection）寄存器
+// 它包含了指向 page_table 的物理内存地址, 所以uservec利用管态权限将当前程序的页表换为了管态页表
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
 //
 void
-usertrap(void)
+usertrap(void)  // 用户陷入内核的函数(通过uservec进入)
 {
   int which_dev = 0;
 
@@ -43,22 +55,22 @@ usertrap(void)
 
   // send interrupts and exceptions to kerneltrap(),
   // since we're now in the kernel.
-  w_stvec((uint64)kernelvec);
-
+  w_stvec((uint64)kernelvec); // 首先改变stvec，这样内核中的陷阱将由kernelvec处理
+  // stvec寄存器就是中断向量的位置
   struct proc *p = myproc();
   
   // save user program counter.
-  p->trapframe->epc = r_sepc();
-  
+  p->trapframe->epc = r_sepc(); // 保存用户pc的位置，其实uservec已经保存了一次
+  // 再次保存是因为usertrap中可能有一个进程切换，可能导致sepc被覆盖
   if(r_scause() == 8){
     // system call
 
-    if(p->killed)
+    if(p->killed) // 如果是因为收到 kill 信号
       exit(-1);
 
     // sepc points to the ecall instruction,
     // but we want to return to the next instruction.
-    p->trapframe->epc += 4;
+    p->trapframe->epc += 4; //返回用户态后需要执行ecall之后的下一条指令
 
     // an interrupt will change sstatus &c registers,
     // so don't enable until done with those registers.
@@ -77,7 +89,7 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2)  // 如果是一个计数器中断，则应该让出 cpu
     yield();
 
   usertrapret();
@@ -87,7 +99,7 @@ usertrap(void)
 // return to user space
 //
 void
-usertrapret(void)
+usertrapret(void) // 返回用户态，userret调用
 {
   struct proc *p = myproc();
 
@@ -98,7 +110,7 @@ usertrapret(void)
 
   // send syscalls, interrupts, and exceptions to trampoline.S
   w_stvec(TRAMPOLINE + (uservec - trampoline));
-
+  // 将stvec重设为uservec以返回
   // set up trapframe values that uservec will need when
   // the process next re-enters the kernel.
   p->trapframe->kernel_satp = r_satp();         // kernel page table

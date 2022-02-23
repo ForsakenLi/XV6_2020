@@ -50,7 +50,7 @@ procinit(void)
 int
 cpuid()
 {
-  int id = r_tp();
+  int id = r_tp();  // tp寄存器保存着本cpu的id
   return id;
 }
 
@@ -465,7 +465,7 @@ scheduler(void)
     intr_on();
 
     for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
+      acquire(&p->lock); 
       if(p->state == RUNNABLE) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it

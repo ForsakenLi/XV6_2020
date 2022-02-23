@@ -22,7 +22,7 @@ grep(char *pattern, int fd)
       *q = 0;
       if(match(pattern, p)){
         *q = '\n';
-        write(1, p, q+1 - p);
+        write(1, p, q + 1 - p);
       }
       p = q+1;
     }

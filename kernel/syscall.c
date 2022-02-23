@@ -8,7 +8,7 @@
 #include "defs.h"
 
 // Fetch the uint64 at addr from the current process.
-int
+int //如果用户传递到系统调用的是一个指针，由于页表此时已经变成了内核页表，此时我们需要从myproc的页表中读取
 fetchaddr(uint64 addr, uint64 *ip)
 {
   struct proc *p = myproc();
@@ -129,15 +129,15 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 };
 
-void
+void  // 关键是认识到trapframe是用来完成系统调用的信息交换的
 syscall(void)
 {
   int num;
   struct proc *p = myproc();
 
-  num = p->trapframe->a7;
+  num = p->trapframe->a7; // 从陷阱帧（trapframe）中保存的a7中检索系统调用号
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    p->trapframe->a0 = syscalls[num]();
+    p->trapframe->a0 = syscalls[num](); // 发起调用并将结果记录到a0, 用户发起系统调用的参数保存在a0 a1...中
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);
